@@ -22,14 +22,10 @@ export default function CheckoutPage() {
       </h1>
 
       <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow space-y-6">
-
         <h2 className="text-2xl font-bold">Order Summary</h2>
 
         {cart.map((item) => (
-          <div
-            key={item.id}
-            className="flex justify-between"
-          >
+          <div key={item.id} className="flex justify-between">
             <span>
               {item.name} x {item.quantity}
             </span>
@@ -77,7 +73,6 @@ export default function CheckoutPage() {
         >
           Pay Now
         </button>
-
       </div>
     </div>
   );

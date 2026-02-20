@@ -12,6 +12,7 @@ export default function CartPage() {
       name: "Laptop",
       price: 20000,
       quantity: 1,
+      size: "",
       color: "Black",
       image: "/laptop.jpg",
       inStock: true,

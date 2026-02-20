@@ -1,4 +1,4 @@
-import Link from "next/link";
+
 import { Mail, MapPin } from "lucide-react";
 
 export default function Footer() {
@@ -30,15 +30,14 @@ export default function Footer() {
           <div className="flex items-start gap-3 mb-4">
             <MapPin className="text-yellow-600 mt-1" size={18} />
             <p className="text-gray-500">
-              Student Union Building, University Campus,
-              Nasarawa State University, Keffi
+              KIIT UNIVERSITY,Bhuwaneshwar
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <Mail className="text-yellow-600" size={18} />
             <p className="text-gray-500">
-              official@campusmarketplace.store
+              official@campuscart.store
             </p>
           </div>
         </div>
