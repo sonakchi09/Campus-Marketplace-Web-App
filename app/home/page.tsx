@@ -3,6 +3,8 @@ import Link from "next/link";
 
 export default function HomeSection() {
   return (
+    <section id="home">
+
     <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
       <div className="w-full max-w-4xl text-center">
         
@@ -39,7 +41,7 @@ export default function HomeSection() {
 
           {/* Explore Products Button */}
           <Link
-            href="/products"
+            href="#products"
             className="border-2 border-yellow-400 text-yellow-400 px-8 py-3 rounded-full font-semibold hover:bg-yellow-400 hover:text-black transition w-full sm:w-auto text-center"
           >
             Explore Products
@@ -49,5 +51,6 @@ export default function HomeSection() {
 
       </div>
     </div>
+    </section>
   );
 }

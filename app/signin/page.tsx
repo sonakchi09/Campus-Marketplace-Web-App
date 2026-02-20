@@ -1,89 +1,125 @@
-import { LogIn } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { LogIn, UserPlus } from "lucide-react";
 
 export default function LoginPage() {
+  const [isSignup, setIsSignup] = useState(false);
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gray-100">
 
       {/* LEFT SIDE */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-gray-100 ray-100 px-6 py-12 my-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 my-8">
         <div className="w-full max-w-md">
 
-          
-
-          {/* Welcome */}
-          <h2 className="text-4xl font-bold mb-3 bg-gray-100">
-            Welcome Back!
+          <h2 className="text-4xl font-semibold mb-3">
+            {isSignup ? "Create Account" : "Welcome Back!"}
           </h2>
 
           <p className="text-gray-600 mb-8">
-            Campus deals made simple.
+            {isSignup
+              ? "Join CampusCart and start selling and buying."
+              : "Campus deals made simple."}
           </p>
 
-          {/* Email */}
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full mb-5 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 "
-          />
+          {/* SIGNUP FORM */}
+          {isSignup ? (
+            <>
+              <input
+                type="text"
+                placeholder="First Name"
+                className="input"
+              />
 
-          {/* Password */}
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full mb-4 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 "
-          />
+              <input
+                type="text"
+                placeholder="Last Name"
+                className="input"
+              />
 
-          {/* Remember + Forgot */}
-          <div className="flex items-center justify-between mb-6 text-sm">
-           
-            <button className="text-indigo-600 hover:underline">
-              Forgot password?
-            </button>
-          </div>
+              <input
+                type="tel"
+                placeholder="Phone Number"
+                className="input"
+              />
 
-          {/* Sign In Button */}
-          <button
-  className="flex items-center justify-center gap-2 
-             px-4 py-2 rounded-full
-             border border-yellow-400 
-             w-full
-             focus:outline-none 
-             focus:ring-2 focus:ring-yellow-400"
->
-  <LogIn size={18} className="text-black" />
-  <span>Sign in</span>
-</button>
+              <input
+                type="text"
+                placeholder="Username"
+                className="input"
+              />
 
+              <input
+                type="email"
+                placeholder="Email"
+                className="input"
+              />
 
+              <input
+                type="password"
+                placeholder="Password"
+                className="input"
+              />
 
+              <button className="main-btn mt-4">
+                <UserPlus size={18} />
+                Sign Up
+              </button>
+            </>
+          ) : (
+            <>
+              {/* LOGIN FORM */}
+              <input
+                type="email"
+                placeholder="Email"
+                className="input"
+              />
 
-          {/* Signup */}
+              <input
+                type="password"
+                placeholder="Password"
+                className="input"
+              />
+
+              <div className="flex justify-end mb-6 text-sm">
+                <button className="text-indigo-600 hover:underline">
+                  Forgot password?
+                </button>
+              </div>
+
+              <button className="main-btn">
+                <LogIn size={18} />
+                Log In
+              </button>
+            </>
+          )}
+
+          {/* TOGGLE BUTTON */}
           <p className="text-center text-sm mt-6">
-            Don’t have an account?{" "}
-            <span className="text-indigo-600 font-semibold cursor-pointer">
-              Sign Up
-            </span>
+            {isSignup ? "Already have an account?" : "Don’t have an account?"}
+            <button
+              onClick={() => setIsSignup(!isSignup)}
+              className="ml-2 text-indigo-600 font-semibold hover:underline"
+            >
+              {isSignup ? "Log In" : "Sign Up"}
+            </button>
           </p>
 
         </div>
       </div>
 
       {/* RIGHT SIDE */}
-     <div className="hidden lg:flex lg:w-2/5 h-[80vh] items-center justify-center bg-yellow-400 p-8 my-24 bg-gray-100">
-
-  <div className="max-w-md">
-
-    <img
-      src="/image.png"  // put your image inside public folder
-      alt="Campus Marketplace"
-      className="w-full h-auto mix-blend-multiply"
-    />
-
-  </div>
-</div>
-
+      <div className="hidden lg:flex lg:w-2/5 h-[80vh] items-center justify-center p-8 my-24 bg-yellow-400">
+        <div className="max-w-md">
+          <img
+            src="/image.png"
+            alt="Campus Marketplace"
+            className="w-full h-auto mix-blend-multiply"
+          />
+        </div>
       </div>
 
-    
+    </div>
   );
 }

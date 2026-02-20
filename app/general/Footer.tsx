@@ -3,7 +3,7 @@ import { Mail, MapPin } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-yellow-400 text-gray-300 pt-16 pb-8 px-6">
+    <footer id="contact" className="bg-yellow-400 text-gray-300 pt-16 pb-8 px-6">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12">
 
         {/* LEFT SECTION */}
