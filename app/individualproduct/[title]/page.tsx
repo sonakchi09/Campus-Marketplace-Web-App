@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database";
-import { db } from "@/src/firebase/config";
+import { auth, db } from "@/src/firebase/config";
 import ReviewSection from "@/app/detailcomponents/ReviewSection";
 import { Heart, MessageCircle } from "lucide-react";
 

@@ -1,9 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ref, push, onValue } from "firebase/database";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { ref, onValue, get, push, set, update } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/src/firebase/config";
+import { Heart, Mail, Phone, ShoppingCart, Check } from "lucide-react";
+
+type Product = {
+  id: string;
+  sellerId: string;
+  name: string;
+  price: string;
+  description: string;
+  category: string;
+  imagePreview: string;
+  quantity: string;
+  sellerEmail: string;
+};
+
+type SellerProfile = {
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+};
 
 type Review = {
   id: string;
@@ -14,27 +34,30 @@ type Review = {
   createdAt: number;
 };
 
-type Props = {
-  productId: string;   // the Firebase push key of the product
-  sellerId: string;    // the sellerId (uid of seller)
-};
+export default function IndividualProductPage() {
+  const params = useParams();
+  const title = decodeURIComponent(params.title as string);
 
-export default function ReviewSection({ productId, sellerId }: Props) {
-  const [reviews, setReviews]     = useState<Review[]>([]);
-  const [text, setText]           = useState("");
+  const [product, setProduct]         = useState<Product | null>(null);
+  const [seller, setSeller]           = useState<SellerProfile | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [wishlisted, setWishlisted]   = useState(false);
+  const [added, setAdded]             = useState(false);
+
+  const [reviews, setReviews]         = useState<Review[]>([]);
+  const [reviewText, setReviewText]   = useState("");
+  const [submitting, setSubmitting]   = useState(false);
+  const [submitted, setSubmitted]     = useState(false);
   const [currentUser, setCurrentUser] = useState<{ uid: string; name: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
-  // Listen to auth state
+  // Auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const name =
-          user.displayName ||
-          user.email?.split("@")[0] ||
-          "Anonymous";
-        setCurrentUser({ uid: user.uid, name });
+        setCurrentUser({
+          uid: user.uid,
+          name: user.displayName || user.email?.split("@")[0] || "Anonymous",
+        });
       } else {
         setCurrentUser(null);
       }
@@ -42,118 +65,268 @@ export default function ReviewSection({ productId, sellerId }: Props) {
     return () => unsub();
   }, []);
 
-  // Read reviews from: products/{sellerId}/{productId}/reviews
+  // Load product
   useEffect(() => {
-    if (!sellerId || !productId) return;
-    const reviewsRef = ref(db, `products/${sellerId}/${productId}/reviews`);
-    const unsub = onValue(reviewsRef, (snapshot) => {
+    const unsubscribe = onValue(ref(db, "products"), (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const list: Review[] = Object.entries(data).map(([id, val]: any) => ({
-          id,
-          ...val,
-        }));
-        // Sort newest first
-        list.sort((a, b) => b.createdAt - a.createdAt);
-        setReviews(list);
-      } else {
-        setReviews([]);
-      }
-    });
-    return () => unsub();
-  }, [sellerId, productId]);
-
-  const handleSubmit = async () => {
-    if (!text.trim() || !currentUser || submitting) return;
-    setSubmitting(true);
-    try {
-      await push(
-        ref(db, `products/${sellerId}/${productId}/reviews`),
-        {
-          text: text.trim(),
-          authorName: currentUser.name,
-          authorInitial: currentUser.name[0].toUpperCase(),
-          uid: currentUser.uid,
-          createdAt: Date.now(),
+        let found: Product | null = null;
+        outer: for (const [sellerId, userProducts] of Object.entries(data) as any) {
+          for (const [id, val] of Object.entries(userProducts) as any) {
+            if (!val || typeof val !== "object" || !val.name) continue;
+            if (val.name.toLowerCase() === title.toLowerCase()) {
+              found = { id, sellerId, ...val };
+              break outer;
+            }
+          }
         }
-      );
-      setText("");
-      setSubmitted(true);
-      setTimeout(() => setSubmitted(false), 2500);
-    } catch (err: any) {
-      alert("Failed to submit review: " + err.message);
+        setProduct(found);
+        if (found?.sellerId) {
+          onValue(ref(db, `users/${found.sellerId}`), (snap) => {
+            setSeller(snap.val());
+          });
+        }
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [title]);
+
+  // Load reviews
+  useEffect(() => {
+    if (!product) return;
+    const unsub = onValue(
+      ref(db, `products/${product.sellerId}/${product.id}/reviews`),
+      (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const list: Review[] = Object.entries(data).map(([id, val]: any) => ({ id, ...val }));
+          list.sort((a, b) => b.createdAt - a.createdAt);
+          setReviews(list);
+        } else {
+          setReviews([]);
+        }
+      }
+    );
+    return () => unsub();
+  }, [product]);
+
+  const handleAddToCart = async () => {
+    if (!currentUser) { window.location.href = "/signin"; return; }
+    if (!product || added) return;
+    setAdded(true);
+    const snapshot = await get(ref(db, `carts/${currentUser.uid}`));
+    const data = snapshot.val();
+    if (data) {
+      const existing = Object.entries(data).find(([, v]: any) => v.name === product.name);
+      if (existing) {
+        const [key, val]: any = existing;
+        await update(ref(db, `carts/${currentUser.uid}/${key}`), { quantity: val.quantity + 1 });
+        setTimeout(() => setAdded(false), 2000);
+        return;
+      }
     }
+    const numericPrice = Number(String(product.price).replace(/,/g, "")) || 0;
+    await push(ref(db, `carts/${currentUser.uid}`), {
+      name: product.name, price: numericPrice,
+      image: product.imagePreview, category: product.category,
+      quantity: 1, seller: product.sellerEmail,
+      inStock: true, color: "", size: "",
+    });
+    setTimeout(() => setAdded(false), 2000);
+  };
+
+  const handleWishlist = async () => {
+    if (!currentUser || !product) return;
+    await set(ref(db, `wishlist/${currentUser.uid}/${product.name.replace(/\s+/g, "_")}`), {
+      title: product.name, price: product.price,
+      image: product.imagePreview, category: product.category,
+    });
+    setWishlisted(true);
+    setTimeout(() => setWishlisted(false), 2000);
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewText.trim() || !currentUser || !product || submitting) return;
+    setSubmitting(true);
+    await push(ref(db, `products/${product.sellerId}/${product.id}/reviews`), {
+      text: reviewText.trim(),
+      authorName: currentUser.name,
+      authorInitial: currentUser.name[0].toUpperCase(),
+      uid: currentUser.uid,
+      createdAt: Date.now(),
+    });
+    setReviewText("");
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 2500);
     setSubmitting(false);
   };
 
-  const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
+  const formatDate = (ts: number) =>
+    new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+
+  const displayPrice = (() => {
+    if (!product) return "";
+    const raw = String(product.price).replace(/,/g, "");
+    const num = parseFloat(raw);
+    return isNaN(num) ? product.price : `₹${num.toLocaleString("en-IN")}`;
+  })();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-16">
+    <div className="max-w-6xl mx-auto px-6 pt-24 pb-32">
 
-      {/* TITLE */}
-      <h2 className="text-2xl font-semibold mb-6">Customer Reviews</h2>
+      {/* PRODUCT SECTION */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
 
-      {/* WRITE REVIEW */}
-      {currentUser ? (
-        <div className="flex items-center gap-4 mb-10">
-          <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center text-black font-semibold text-sm shrink-0">
-            {currentUser.name[0].toUpperCase()}
+        {/* IMAGE */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-md h-[380px] border rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center">
+            <img
+              src={product?.imagePreview || `/${title.toLowerCase().replace(/ /g, "")}.jpg`}
+              alt={title}
+              className="object-contain w-full h-full"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+            />
+          </div>
+        </div>
+
+        {/* DETAILS */}
+        <div className="space-y-6">
+          <h1 className="text-3xl font-semibold mt-12">
+            {product?.name ?? title}
+          </h1>
+
+          <div className="flex items-center gap-2 text-yellow-500">
+            ⭐⭐⭐⭐☆
+            <span className="text-gray-500 text-sm">({reviews.length} reviews)</span>
           </div>
 
-          <input
-            type="text"
-            placeholder="Write your review..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            className="flex-1 border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
-          />
+          <p className="text-4xl font-bold text-yellow-500">
+            {product ? displayPrice : "—"}
+          </p>
 
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !text.trim()}
-            className="bg-yellow-400 px-10 py-2 rounded-lg font-medium hover:bg-yellow-500 disabled:opacity-50 transition"
-          >
-            {submitted ? "✓ Sent!" : submitting ? "Posting..." : "Submit"}
-          </button>
-        </div>
-      ) : (
-        <p className="text-sm text-gray-500 mb-10">
-          Please{" "}
-          <a href="/signin" className="text-yellow-500 font-semibold underline">
-            sign in
-          </a>{" "}
-          to write a review.
-        </p>
-      )}
+          <p className="text-gray-600 leading-relaxed max-w-lg">
+            {product?.description || "No description provided."}
+          </p>
 
-      {/* REVIEWS LIST */}
-      {reviews.length === 0 ? (
-        <p className="text-gray-400 text-sm">No reviews yet. Be the first!</p>
-      ) : (
-        <div className="flex flex-col gap-8">
-          {reviews.map((review) => (
-            <div key={review.id} className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold shrink-0">
-                {review.authorInitial}
-              </div>
+          {product && (
+            <p className="text-sm text-gray-400">
+              Category: {product.category} · Qty: {product.quantity}
+            </p>
+          )}
 
-              <div>
-                <p className="font-semibold">{review.authorName}</p>
-                <p className="text-sm text-gray-500">{formatDate(review.createdAt)}</p>
-                <p className="mt-2 text-gray-700 max-w-2xl">{review.text}</p>
-              </div>
+          {/* SELLER CONTACT */}
+          {product && (
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-100">
+              <p className="text-sm font-semibold text-gray-700">Contact Seller</p>
+              {product.sellerEmail && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Mail size={14} />
+                  <a href={`mailto:${product.sellerEmail}`} className="hover:text-yellow-500 transition">
+                    {product.sellerEmail}
+                  </a>
+                </div>
+              )}
+              {seller?.phone && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Phone size={14} />
+                  <a href={`tel:${seller.phone}`} className="hover:text-yellow-500 transition">
+                    {seller.phone}
+                  </a>
+                </div>
+              )}
             </div>
-          ))}
+          )}
+
+          {/* BUTTONS */}
+          <div className="flex items-center gap-4 pt-2">
+            <button
+              onClick={handleAddToCart}
+              className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold transition ${
+                added ? "bg-green-400 text-white" : "bg-yellow-400 hover:bg-yellow-500 text-black"
+              }`}
+            >
+              {added ? <Check size={16} /> : <ShoppingCart size={16} />}
+              {added ? "Added!" : "Add to Cart"}
+            </button>
+
+            <button
+              onClick={handleWishlist}
+              className="p-3 rounded-lg border hover:bg-gray-50 transition hover:scale-110"
+            >
+              <Heart
+                size={22}
+                className={wishlisted ? "text-red-500 fill-red-500" : "text-gray-600"}
+              />
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* REVIEWS */}
+      <div className="mt-24 pt-8 border-t border-gray-100">
+        <h2 className="text-2xl font-semibold mb-6">Customer Reviews</h2>
+
+        {product ? (
+          currentUser ? (
+            <div className="flex items-center gap-4 mb-10">
+              <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center text-black font-semibold text-sm shrink-0">
+                {currentUser.name[0].toUpperCase()}
+              </div>
+              <input
+                type="text"
+                placeholder="Write your review..."
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleReviewSubmit()}
+                className="flex-1 border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
+              />
+              <button
+                onClick={handleReviewSubmit}
+                disabled={submitting || !reviewText.trim()}
+                className="bg-yellow-400 px-8 py-2 rounded-lg font-medium hover:bg-yellow-500 disabled:opacity-50 transition"
+              >
+                {submitted ? "✓ Sent!" : submitting ? "Posting..." : "Submit"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 mb-10">
+              Please{" "}
+              <a href="/signin" className="text-yellow-500 font-semibold underline">sign in</a>
+              {" "}to write a review.
+            </p>
+          )
+        ) : (
+          <p className="text-gray-400 text-sm mb-10">Reviews only available for marketplace products.</p>
+        )}
+
+        {reviews.length === 0 ? (
+          <p className="text-gray-400 text-sm">No reviews yet. Be the first!</p>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {reviews.map((review) => (
+              <div key={review.id} className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold shrink-0">
+                  {review.authorInitial}
+                </div>
+                <div>
+                  <p className="font-semibold">{review.authorName}</p>
+                  <p className="text-sm text-gray-500">{formatDate(review.createdAt)}</p>
+                  <p className="mt-2 text-gray-700 max-w-2xl">{review.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
     </div>
   );
