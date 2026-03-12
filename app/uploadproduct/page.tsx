@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { ref, push } from "firebase/database";
+import { auth, db } from "@/src/firebase/config";
 
 export default function UploadProduct() {
   const [form, setForm] = useState({
@@ -19,13 +21,16 @@ export default function UploadProduct() {
     reader.readAsDataURL(file);
   }
 
-  function handleSubmit(e: any) {
+  async function handleSubmit(e: any) {
     e.preventDefault();
 
-    // Save to localStorage so admin can see it
-    const existing = JSON.parse(localStorage.getItem("pendingProducts") || "[]");
-    existing.push({ ...form, status: "pending", id: Date.now() });
-    localStorage.setItem("pendingProducts", JSON.stringify(existing));
+    await push(ref(db, "products"), {
+      ...form,
+      status: "approved",
+      createdAt: Date.now(),
+      sellerId: auth.currentUser?.uid ?? null,
+      sellerEmail: auth.currentUser?.email ?? null,
+    });
 
     setSubmitted(true);
   }
@@ -35,8 +40,8 @@ export default function UploadProduct() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-3xl font-extrabold mb-2">Request Sent!</h2>
-          <p className="text-gray-500">Your product has been submitted for admin review.</p>
+          <h2 className="text-3xl font-extrabold mb-2">Product Listed!</h2>
+          <p className="text-gray-500">Your product is now live on CampusCart.</p>
         </div>
       </div>
     );
@@ -137,8 +142,8 @@ export default function UploadProduct() {
                 <p className="text-sm text-gray-500">
                   {form.description || "Description will appear here..."}
                 </p>
-                <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 text-xs text-yellow-700 font-semibold text-center">
-                  ⏳ Pending Admin Approval
+                <div className="mt-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-xs text-green-700 font-semibold text-center">
+                  ✅ Will be listed immediately
                 </div>
               </div>
 

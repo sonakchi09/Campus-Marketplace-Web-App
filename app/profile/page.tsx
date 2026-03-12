@@ -1,62 +1,91 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { ref, onValue } from "firebase/database";
+import { auth, db } from "@/src/firebase/config";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
 export default function ProfilePage() {
+  const router = useRouter();
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [listings, setListings] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        onValue(ref(db, `users/${user.uid}`), (snapshot) => {
+          setUserData(snapshot.val());
+        });
+
+        onValue(ref(db, "products"), (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            const all = Object.entries(data).map(([id, val]: any) => ({ id, ...val }));
+            setListings(all.filter((p) => p.sellerId === user.uid));
+          } else {
+            setListings([]);
+          }
+        });
+
+        onValue(ref(db, `checkout/${user.uid}`), (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            setOrders(Object.entries(data).map(([id, val]: any) => ({ id, ...val })));
+          } else {
+            setOrders([]);
+          }
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/signin");
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  if (!firebaseUser) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center gap-4">
+        <h2 className="text-2xl font-bold">You are not logged in</h2>
+        <p className="text-gray-500">Please sign in to view your profile.</p>
+        <Link href="/signin" className="bg-yellow-400 text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition">
+          Go to Sign In
+        </Link>
+      </div>
+    );
+  }
+
   const user = {
-    name: "abc",
-    email: "abc@email.com",
-    phone: "+91 9876543210",
+    name: userData?.firstName ?? firebaseUser.displayName ?? "User",
+    email: firebaseUser.email ?? "",
+    phone: userData?.phone ?? "+91 XXXXXXXXXX",
     college: "KIIT University",
     year: "3rd Year",
   };
 
-  const listings = [
-    {
-      id: "1",
-      name: "Engineering Maths Book",
-      price: 500,
-      status: "Active",
-      image: "https://via.placeholder.com/80",
-    },
-    {
-      id: "2",
-      name: "Hostel Table Lamp",
-      price: 700,
-      status: "Sold",
-      image: "https://via.placeholder.com/80",
-    },
-  ];
-
-  const orders = [
-    {
-      id: "1",
-      name: "iPhone 15",
-      price: 80000,
-      date: "12 Feb 2026",
-      image: "https://via.placeholder.com/80",
-    },
-    {
-      id: "2",
-      name: "AirPods Pro",
-      price: 25000,
-      date: "10 Feb 2026",
-      image: "https://via.placeholder.com/80",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-100 pt-24 pb-32 px-6">
-      <h1 className="text-4xl font-bold text-center mb-10">
-        My Profile
-      </h1>
+      <h1 className="text-4xl font-bold text-center mb-10">My Profile</h1>
 
       <div className="max-w-6xl mx-auto space-y-10">
+
         {/* Profile Card */}
         <div className="bg-white p-8 rounded-xl shadow">
           <div className="flex items-center gap-6">
             <div className="w-24 h-24 rounded-full bg-yellow-400 flex items-center justify-center text-2xl font-bold">
-              {user.name.charAt(0)}
+              {user.name.charAt(0).toUpperCase()}
             </div>
-
             <div>
               <h2 className="text-2xl font-bold">{user.name}</h2>
               <p>{user.email}</p>
@@ -69,19 +98,16 @@ export default function ProfilePage() {
 
         {/* Listings + Orders Side by Side */}
         <div className="grid md:grid-cols-2 gap-8">
-          
+
           {/* My Listings */}
           <div className="bg-white p-8 rounded-xl shadow">
             <h2 className="text-2xl font-bold mb-6">My Listings</h2>
-
+            {listings.length === 0 && <p className="text-gray-500">No listings yet.</p>}
             {listings.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between border-b py-4 gap-4"
-              >
+              <div key={item.id} className="flex items-center justify-between border-b py-4 gap-4">
                 <div className="flex items-center gap-4">
                   <img
-                    src={item.image}
+                    src={item.imagePreview ?? "/placeholder.png"}
                     alt={item.name}
                     className="w-16 h-16 object-cover rounded-md"
                   />
@@ -90,15 +116,8 @@ export default function ProfilePage() {
                     <p>₹{item.price}</p>
                   </div>
                 </div>
-
-                <span
-                  className={`px-4 py-1 rounded-full text-sm ${
-                    item.status === "Sold"
-                      ? "bg-red-200 text-red-700"
-                      : "bg-green-200 text-green-700"
-                  }`}
-                >
-                  {item.status}
+                <span className={`px-4 py-1 rounded-full text-sm ${item.status === "Sold" ? "bg-red-200 text-red-700" : "bg-green-200 text-green-700"}`}>
+                  {item.status ?? "Active"}
                 </span>
               </div>
             ))}
@@ -107,39 +126,30 @@ export default function ProfilePage() {
           {/* Order History */}
           <div className="bg-white p-8 rounded-xl shadow">
             <h2 className="text-2xl font-bold mb-6">Order History</h2>
-
+            {orders.length === 0 && <p className="text-gray-500">No orders yet.</p>}
             {orders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between border-b py-4 gap-4"
-              >
-                <div className="flex items-center gap-4">
-                  <img
-                    src={order.image}
-                    alt={order.name}
-                    className="w-16 h-16 object-cover rounded-md"
-                  />
-                  <div>
-                    <h3 className="font-semibold">{order.name}</h3>
-                    <p className="text-sm text-gray-500">
-                      {order.date}
-                    </p>
-                  </div>
+              <div key={order.id} className="flex items-center justify-between border-b py-4 gap-4">
+                <div>
+                  <h3 className="font-semibold">Order #{order.id.slice(0, 6)}</h3>
+                  <p className="text-sm text-gray-500">{new Date(order.createdAt).toLocaleDateString("en-IN")}</p>
                 </div>
-
-                <p className="font-bold">₹{order.price}</p>
+                <p className="font-bold">₹{Number(order.total).toLocaleString("en-IN")}</p>
               </div>
             ))}
           </div>
 
         </div>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <div className="text-center">
-          <button className="bg-red-500 text-white px-8 py-3 rounded-full font-bold hover:scale-105 transition">
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-8 py-3 rounded-full font-bold hover:scale-105 transition"
+          >
             Logout
           </button>
         </div>
+
       </div>
     </div>
   );
