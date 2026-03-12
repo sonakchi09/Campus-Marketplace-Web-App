@@ -14,6 +14,7 @@ type ProductCardProps = {
   price: string;
   category?: string;
   isNew?: boolean;
+  isBase64?: boolean;
 };
 
 export default function ProductCard({
@@ -22,6 +23,7 @@ export default function ProductCard({
   price,
   category = "Uncategorized",
   isNew = false,
+  isBase64 = false,
 }: ProductCardProps) {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
@@ -36,13 +38,13 @@ export default function ProductCard({
   }, []);
 
   const handleCardClick = () => {
-    router.push(`/product/${title}`);
+    router.push(`/product/${encodeURIComponent(title)}`);
   };
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!uid) { router.push("/signin"); return; }
-    if (added) return; // prevent double click
+    if (added) return;
 
     setAdded(true);
 
@@ -62,9 +64,12 @@ export default function ProductCard({
       }
     }
 
+    // Parse price safely — strip commas and convert
+    const numericPrice = Number(String(price).replace(/,/g, "")) || 0;
+
     await push(ref(db, `carts/${uid}`), {
       name: title,
-      price: Number(price.replace(/,/g, "")),
+      price: numericPrice,
       image,
       category,
       quantity: 1,
@@ -92,8 +97,22 @@ export default function ProductCard({
       onClick={handleCardClick}
       className="w-full max-w-sm rounded-xl bg-white shadow-md transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
     >
-      <div className="relative h-48 w-full overflow-hidden rounded-t-xl">
-        <Image src={image} alt={title} fill className="object-cover" />
+      {/* Use plain <img> for base64, Next Image for file paths */}
+      <div className="relative h-48 w-full overflow-hidden rounded-t-xl bg-gray-100">
+        {isBase64 || image.startsWith("data:") ? (
+          <img
+            src={image}
+            alt={title || "Product image"}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Image
+            src={image || "/placeholder.png"}
+            alt={title || "Product image"}
+            fill
+            className="object-cover"
+          />
+        )}
       </div>
 
       <div className="p-4 space-y-3">

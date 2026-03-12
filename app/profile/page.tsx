@@ -22,11 +22,11 @@ export default function ProfilePage() {
           setUserData(snapshot.val());
         });
 
-        onValue(ref(db, "products"), (snapshot) => {
+        // products/{uid}/{productId}
+        onValue(ref(db, `products/${user.uid}`), (snapshot) => {
           const data = snapshot.val();
           if (data) {
-            const all = Object.entries(data).map(([id, val]: any) => ({ id, ...val }));
-            setListings(all.filter((p) => p.sellerId === user.uid));
+            setListings(Object.entries(data).map(([id, val]: any) => ({ id, ...val })));
           } else {
             setListings([]);
           }
