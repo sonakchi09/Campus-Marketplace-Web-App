@@ -27,7 +27,10 @@ export default function ProductSection() {
       if (data) {
         const list: any[] = [];
         Object.entries(data).forEach(([uid, userProducts]: any) => {
+          // each key under a uid is either a product (has "name") or something else — skip non-products
           Object.entries(userProducts).forEach(([id, val]: any) => {
+            // skip if val is not an object or has no "name" field (e.g. reviews node)
+            if (!val || typeof val !== "object" || !val.name) return;
             list.push({ id, uid, ...val });
           });
         });
@@ -42,17 +45,19 @@ export default function ProductSection() {
   const firebaseCards = firebaseProducts
     .filter((p) => p.name && p.name.trim() !== "")
     .map((p) => {
-    const rawPrice = String(p.price ?? "").replace(/,/g, "");
-    const numPrice = parseFloat(rawPrice);
-    return {
-      image: p.imagePreview || "/placeholder.png",
-      title: p.name,
-      price: isNaN(numPrice) ? rawPrice : numPrice.toLocaleString("en-IN"),
-      category: p.category || "Other",
-      isNew: false,
-      isBase64: !!(p.imagePreview && p.imagePreview.startsWith("data:")),
-    };
-  });
+      const rawPrice = String(p.price ?? "").replace(/,/g, "");
+      const numPrice = parseFloat(rawPrice);
+      return {
+        image: p.imagePreview || "/placeholder.png",
+        title: p.name,
+        price: isNaN(numPrice) ? rawPrice : numPrice.toLocaleString("en-IN"),
+        category: p.category || "Other",
+        isNew: false,
+        isBase64: !!(p.imagePreview && p.imagePreview.startsWith("data:")),
+        sellerId: p.sellerId,
+        productId: p.id,
+      };
+    });
 
   const allProducts = [...firebaseCards, ...staticProducts];
 

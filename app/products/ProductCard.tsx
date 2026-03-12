@@ -1,4 +1,5 @@
 "use client";
+// UPDATED — routes to /individualProduct/[title]
 
 import Image from "next/image";
 import { Heart, ShoppingCart, Check } from "lucide-react";
@@ -38,7 +39,7 @@ export default function ProductCard({
   }, []);
 
   const handleCardClick = () => {
-    router.push(`/product/${encodeURIComponent(title)}`);
+    router.push(`/individualproduct/${encodeURIComponent(title)}`);
   };
 
   const handleAddToCart = async (e: React.MouseEvent) => {
