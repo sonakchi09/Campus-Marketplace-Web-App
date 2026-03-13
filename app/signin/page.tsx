@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [lastName, setLastName] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [username, setUsername] = useState<string>("");
+  const [resetSent, setResetSent] = useState(false);
 
   const allowedDomain = "@kiit.ac.in";
 
@@ -31,7 +32,6 @@ export default function LoginPage() {
         return;
       }
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      // Create user node in RTDB
       await set(ref(db, `users/${result.user.uid}`), {
         email,
         phone,
@@ -70,7 +70,6 @@ export default function LoginPage() {
         alert("Only campus email allowed!");
         return;
       }
-      // Create user node if it doesn't exist
       await set(ref(db, `users/${result.user.uid}`), {
         email: userEmail,
         phone: "",
@@ -90,13 +89,17 @@ export default function LoginPage() {
   };
 
   const handleForgotPassword = async () => {
+    if (!email) {
+      alert("Enter your email address above first, then click Forgot Password.");
+      return;
+    }
+    if (!email.endsWith(allowedDomain)) {
+      alert("Only campus email allowed!");
+      return;
+    }
     try {
-      if (!email.endsWith(allowedDomain)) {
-        alert("Only campus email allowed!");
-        return;
-      }
       await sendPasswordResetEmail(auth, email);
-      alert("Password reset email sent!");
+      setResetSent(true);
     } catch (error: any) {
       alert(error.message);
     }
@@ -125,7 +128,7 @@ export default function LoginPage() {
               <input type="text" placeholder="Last Name" className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               <input type="tel" placeholder="Phone Number" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <input type="text" placeholder="Username" className="input" value={username} onChange={(e) => setUsername(e.target.value)} />
-              <input type="email" placeholder="Email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input type="email" placeholder="Campus Email (@kiit.ac.in)" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
               <input type="password" placeholder="Password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
               <button className="main-btn mt-4" onClick={handleSignup}>
                 <UserPlus size={18} />
@@ -134,16 +137,48 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <input type="email" placeholder="Email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input type="password" placeholder="Password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input
+                type="email"
+                placeholder="Campus Email (@kiit.ac.in)"
+                className="input"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setResetSent(false); }}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+
               <div className="flex justify-end mb-6 text-sm">
-                <button className="text-indigo-600 hover:underline" onClick={handleForgotPassword}>
-                  Forgot password?
-                </button>
+                {resetSent ? (
+                  <span className="text-green-600 font-medium">
+                    ✓ Reset email sent! Check your inbox.
+                  </span>
+                ) : (
+                  <button
+                    className="text-indigo-600 hover:underline"
+                    onClick={handleForgotPassword}
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
+
               <button className="main-btn" onClick={handleLogin}>
                 <LogIn size={18} />
                 Log In
+              </button>
+
+              {/* Google Sign In */}
+              <button
+                onClick={handleGoogleSignIn}
+                className="w-full mt-3 flex items-center justify-center gap-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl transition"
+              >
+                <img src="/google.svg" alt="Google" className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                Continue with Google
               </button>
             </>
           )}
@@ -156,6 +191,7 @@ export default function LoginPage() {
                 setEmail(""); setPassword("");
                 setFirstName(""); setLastName("");
                 setPhone(""); setUsername("");
+                setResetSent(false);
               }}
               className="ml-2 text-indigo-600 font-semibold hover:underline"
             >

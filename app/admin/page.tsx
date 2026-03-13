@@ -5,10 +5,10 @@ import {
   CheckCircle, XCircle, Clock, Package,
   Search, ShoppingBag, AlertCircle, Eye,
 } from "lucide-react";
-import { ref, onValue, update, remove, set } from "firebase/database";
+import { ref, onValue, remove, set } from "firebase/database";
 import { db } from "@/src/firebase/config";
 
-type Status = "pending" | "approved" | "rejected";
+type Status = "pending" | "approved";
 
 type Product = {
   id: string;
@@ -28,7 +28,6 @@ type Product = {
 const statusConfig: Record<Status, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   pending:  { label: "Pending",  color: "text-amber-600",   bg: "bg-amber-50 border-amber-200",    icon: <Clock size={14} /> },
   approved: { label: "Approved", color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", icon: <CheckCircle size={14} /> },
-  rejected: { label: "Rejected", color: "text-red-500",     bg: "bg-red-50 border-red-200",         icon: <XCircle size={14} /> },
 };
 
 export default function AdminPage() {
@@ -56,7 +55,6 @@ export default function AdminPage() {
   }, []);
 
   const approveProduct = async (product: Product) => {
-    // Save to products/{sellerId}/{id}
     await set(ref(db, `products/${product.sellerId}/${product.id}`), {
       name: product.name,
       price: product.price,
@@ -70,13 +68,14 @@ export default function AdminPage() {
       status: "approved",
     });
     await remove(ref(db, `pendingProducts/${product.sellerId}/${product.id}`));
-    if (selected?.id === product.id) setSelected((s) => s && { ...s, status: "approved" });
+    if (selected?.id === product.id) setSelected(null);
   };
 
+  // Reject = remove from pendingProducts entirely + remove from products if it was there
   const rejectProduct = async (product: Product) => {
-    await update(ref(db, `pendingProducts/${product.sellerId}/${product.id}`), { status: "rejected" });
+    await remove(ref(db, `pendingProducts/${product.sellerId}/${product.id}`));
     await remove(ref(db, `products/${product.sellerId}/${product.id}`));
-    if (selected?.id === product.id) setSelected((s) => s && { ...s, status: "rejected" });
+    if (selected?.id === product.id) setSelected(null);
   };
 
   const deleteProduct = async (product: Product) => {
@@ -102,7 +101,6 @@ export default function AdminPage() {
     all: products.length,
     pending: products.filter((p) => p.status === "pending").length,
     approved: products.filter((p) => p.status === "approved").length,
-    rejected: products.filter((p) => p.status === "rejected").length,
   };
 
   return (
@@ -126,12 +124,13 @@ export default function AdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+
+        {/* STATS */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
             { label: "Total Uploads",  value: counts.all,      icon: <Package size={20} />,     color: "text-gray-700",    accent: "bg-gray-100"  },
             { label: "Pending Review", value: counts.pending,  icon: <AlertCircle size={20} />, color: "text-amber-600",   accent: "bg-amber-50"  },
             { label: "Approved",       value: counts.approved, icon: <CheckCircle size={20} />, color: "text-emerald-600", accent: "bg-emerald-50" },
-            { label: "Rejected",       value: counts.rejected, icon: <XCircle size={20} />,     color: "text-red-500",     accent: "bg-red-50"    },
           ].map((stat) => (
             <div key={stat.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
               <div className={`w-11 h-11 rounded-xl ${stat.accent} flex items-center justify-center ${stat.color}`}>{stat.icon}</div>
@@ -143,6 +142,7 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {/* SEARCH + FILTER */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -152,7 +152,7 @@ export default function AdminPage() {
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(["all", "pending", "approved", "rejected"] as const).map((f) => (
+            {(["all", "pending", "approved"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition-all border ${
                   filter === f ? "bg-yellow-400 text-black border-yellow-400 shadow-md shadow-yellow-100" : "bg-white text-gray-600 border-gray-200 hover:border-yellow-300"
@@ -164,14 +164,16 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* EMPTY STATE */}
         {products.length === 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
             <Package size={40} className="text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-gray-700 mb-1">No products uploaded yet</h3>
+            <h3 className="text-lg font-bold text-gray-700 mb-1">No products to approve</h3>
             <p className="text-gray-400 text-sm">When sellers submit products, they'll appear here for review.</p>
           </div>
         )}
 
+        {/* TABLE + DETAIL PANEL */}
         {products.length > 0 && (
           <div className="flex gap-6">
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

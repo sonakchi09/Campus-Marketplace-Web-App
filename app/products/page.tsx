@@ -5,21 +5,9 @@ import { ref, onValue } from "firebase/database";
 import { db } from "@/src/firebase/config";
 import ProductCard from "./ProductCard";
 
-const staticProducts = [
-  { image: "/laptop.jpg",     title: "Laptop",     price: "20,000", category: "Electronics", isNew: false, isBase64: false },
-  { image: "/calculator.jpg", title: "Calculator", price: "500",    category: "Stationary",  isNew: false, isBase64: false },
-  { image: "/textbook.jpg",   title: "TextBook",   price: "600",    category: "Books",        isNew: true,  isBase64: false },
-  { image: "/usbdriver.jpg",  title: "Usb Driver", price: "800",    category: "Electronics", isNew: true,  isBase64: false },
-  { image: "/chair.png",      title: "Chair",      price: "300",    category: "Furniture",   isNew: true,  isBase64: false },
-  { image: "/camera.png",     title: "Camera",     price: "20,000", category: "Electronics", isNew: true,  isBase64: false },
-  { image: "/table.png",      title: "Table",      price: "200",    category: "Furniture",   isNew: false, isBase64: false },
-  { image: "/charger.png",    title: "Charger",    price: "1800",   category: "Electronics", isNew: false, isBase64: false },
-  { image: "/bag.png",        title: "Bag",        price: "500",    category: "Stationary",  isNew: true,  isBase64: false },
-  { image: "/bottle.png",     title: "Bottle",     price: "300",    category: "Other",       isNew: false, isBase64: false },
-];
-
 export default function ProductSection() {
   const [firebaseProducts, setFirebaseProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onValue(ref(db, "products"), (snapshot) => {
@@ -27,9 +15,7 @@ export default function ProductSection() {
       if (data) {
         const list: any[] = [];
         Object.entries(data).forEach(([uid, userProducts]: any) => {
-          // each key under a uid is either a product (has "name") or something else — skip non-products
           Object.entries(userProducts).forEach(([id, val]: any) => {
-            // skip if val is not an object or has no "name" field (e.g. reviews node)
             if (!val || typeof val !== "object" || !val.name) return;
             list.push({ id, uid, ...val });
           });
@@ -38,11 +24,12 @@ export default function ProductSection() {
       } else {
         setFirebaseProducts([]);
       }
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const firebaseCards = firebaseProducts
+  const cards = firebaseProducts
     .filter((p) => p.name && p.name.trim() !== "")
     .map((p) => {
       const rawPrice = String(p.price ?? "").replace(/,/g, "");
@@ -59,8 +46,6 @@ export default function ProductSection() {
       };
     });
 
-  const allProducts = [...firebaseCards, ...staticProducts];
-
   return (
     <main className="p-6">
       <section id="products" className="scroll-mt-16">
@@ -71,11 +56,20 @@ export default function ProductSection() {
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {allProducts.map((product, index) => (
-            <ProductCard key={index} {...product} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="text-center py-20 text-gray-400">Loading products...</div>
+        ) : cards.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <p className="text-lg font-medium">No products listed yet.</p>
+            <p className="text-sm mt-1">Be the first to sell something!</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {cards.map((product, index) => (
+              <ProductCard key={index} {...product} />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
