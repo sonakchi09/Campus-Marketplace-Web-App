@@ -20,6 +20,11 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/src/firebase/config";
 import MobileNav from "./MobileNav";
 
+const ADMIN_UIDS = [
+  "RI1GbI9luNcLsLiMeUkdU5EyjQg1",
+  "XvLIPhxcDDaOJ5LXcJG87NE9Ch82",
+];
+
 type Product = {
   id: string;
   sellerId: string;
@@ -133,7 +138,6 @@ export default function Navbar() {
     e.preventDefault();
     if (!query.trim()) return;
     setShowDropdown(false);
-    // If exact match exists, go to that product
     const exact = allProducts.find((p) => p.name.toLowerCase() === query.toLowerCase());
     if (exact) {
       router.push(`/individualproduct/${encodeURIComponent(exact.name)}`);
@@ -234,12 +238,15 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-6">
               {uid ? (
                 <>
-                  <Link href="/admin">
-                    <button className="flex items-center gap-1.5 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-bold px-4 py-2 rounded-full transition-all hover:scale-105">
-                      <ShieldCheck size={15} />
-                      Admin
-                    </button>
-                  </Link>
+                  {/* Admin button — only visible to admin UIDs */}
+                  {ADMIN_UIDS.includes(uid) && (
+                    <Link href="/admin">
+                      <button className="flex items-center gap-1.5 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-bold px-4 py-2 rounded-full transition-all hover:scale-105">
+                        <ShieldCheck size={15} />
+                        Admin
+                      </button>
+                    </Link>
+                  )}
 
                   <Link href="/wishlist" className="relative group">
                     <Heart className="w-6 h-6 text-black group-hover:text-yellow-400 transition" />
