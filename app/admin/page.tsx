@@ -6,7 +6,13 @@ import {
   Search, ShoppingBag, AlertCircle, Eye,
 } from "lucide-react";
 import { ref, onValue, remove, set } from "firebase/database";
-import { db } from "@/src/firebase/config";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/src/firebase/config";
+
+const ADMIN_UIDS = [
+  "RI1GbI9luNcLsLiMeUkdU5EyjQg1",
+  "XvLIPhxcDDaOJ5LXcJG87NE9Ch82",
+];
 
 type Status = "pending" | "approved";
 
@@ -31,12 +37,25 @@ const statusConfig: Record<Status, { label: string; color: string; bg: string; i
 };
 
 export default function AdminPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Status | "all">("all");
-  const [selected, setSelected] = useState<Product | null>(null);
+  const [products, setProducts]     = useState<Product[]>([]);
+  const [search, setSearch]         = useState("");
+  const [filter, setFilter]         = useState<Status | "all">("all");
+  const [selected, setSelected]     = useState<Product | null>(null);
+  const [uid, setUid]               = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
+  // Auth check
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setUid(user?.uid ?? null);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Load pending products
+  useEffect(() => {
+    if (!uid || !ADMIN_UIDS.includes(uid)) return;
     const unsubscribe = onValue(ref(db, "pendingProducts"), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -52,7 +71,7 @@ export default function AdminPage() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [uid]);
 
   const approveProduct = async (product: Product) => {
     await set(ref(db, `products/${product.sellerId}/${product.id}`), {
@@ -71,7 +90,6 @@ export default function AdminPage() {
     if (selected?.id === product.id) setSelected(null);
   };
 
-  // Reject = remove from pendingProducts entirely + remove from products if it was there
   const rejectProduct = async (product: Product) => {
     await remove(ref(db, `pendingProducts/${product.sellerId}/${product.id}`));
     await remove(ref(db, `products/${product.sellerId}/${product.id}`));
@@ -102,6 +120,22 @@ export default function AdminPage() {
     pending: products.filter((p) => p.status === "pending").length,
     approved: products.filter((p) => p.status === "approved").length,
   };
+
+  // Loading state
+  if (authLoading) return (
+    <div className="min-h-screen flex items-center justify-center text-gray-400">
+      Loading...
+    </div>
+  );
+
+  // Access denied
+  if (!uid || !ADMIN_UIDS.includes(uid)) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <ShoppingBag size={40} className="text-gray-300" />
+      <p className="text-2xl font-bold text-gray-700">Access Denied</p>
+      <p className="text-gray-400 text-sm">You don't have permission to view this page.</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
